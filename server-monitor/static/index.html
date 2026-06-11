@@ -850,11 +850,22 @@ function toast(msg, type) {
 function safeStr(v) { return typeof v === 'string' ? v : (v && v.message ? v.message : JSON.stringify(v)); }
 
 // ─── API ───────────────────────────────────────────
+function apiErrorMsg(body) {
+  if (!body) return 'Error';
+  if (typeof body === 'string') return body;
+  if (body.detail) {
+    if (typeof body.detail === 'string') return body.detail;
+    if (Array.isArray(body.detail)) return body.detail.map(function(x) { return x.msg || JSON.stringify(x); }).join('; ');
+    return JSON.stringify(body.detail);
+  }
+  return body.message || JSON.stringify(body);
+}
+
 function apiFetch(url, opts) {
   if (!opts) opts = {};
   if (!opts.headers) opts.headers = {};
   opts.headers['Authorization'] = 'Bearer ' + getToken();
-  if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+  if (opts.body && !(opts.body instanceof FormData) && !(opts.body instanceof URLSearchParams)) {
     if (!opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
   }
   return fetch(url, opts);
@@ -1061,7 +1072,7 @@ function addServer() {
     method: 'POST',
     body: JSON.stringify({name: name, target: target, type: type})
   })
-  .then(function(r) { if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'Error'); }); return r.json(); })
+  .then(function(r) { if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); }); return r.json(); })
   .then(function() { closeModal('addServerModal'); toast('Servidor añadido', 'success'); loadServers(); })
   .catch(function(e) { toast('Error: ' + errMsg(e), 'error'); });
 }
@@ -1301,7 +1312,7 @@ function testShockConfig() {
     method: 'PUT', body: JSON.stringify({code: code})
   })
   .then(function(r) {
-    if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'HTTP ' + r.status); });
+    if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); });
     return r.json();
   })
   .then(function() {
@@ -1310,7 +1321,7 @@ function testShockConfig() {
     });
   })
   .then(function(r) {
-    if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'HTTP ' + r.status); });
+    if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); });
     return r.json();
   })
   .then(function(data) {
