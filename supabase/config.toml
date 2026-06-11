@@ -1,0 +1,16 @@
+[project]
+name = "hope-server-monitor"
+
+[auth]
+enabled = true
+
+[auth.settings]
+site_url = "http://localhost:8000"
+additional_redirect_urls = ["http://localhost:8000"]
+
+[api]
+enabled = true
+port = 54321
+
+[db.migrations]
+schema_path = "supabase/migrations"
