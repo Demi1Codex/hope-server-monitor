@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 
 import httpx
 from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -138,6 +139,21 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Hope Server Monitor", lifespan=lifespan)
+
+# CORS — permitir GitHub Pages y otros orígenes
+CORS_ORIGINS = os.environ.get("CORS_ORIGINS", "")
+CORS_LIST = [o.strip() for o in CORS_ORIGINS.split(",") if o.strip()] or [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+    "https://demi1codex.github.io",
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_LIST,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 async def monitor_loop():
@@ -485,7 +501,9 @@ async def spa_fallback(req, exc):
 
 if __name__ == "__main__":
     import uvicorn
-    print("  *  Hope Server Monitor — Multi-usuario")
-    print("  =>  http://localhost:8000")
+    port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "0.0.0.0")
+    print(f"  *  Hope Server Monitor — Multi-usuario")
+    print(f"  =>  http://{host}:{port}")
     print()
-    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=False)
+    uvicorn.run("main:app", host=host, port=port, reload=False)

@@ -633,6 +633,11 @@
 // ─── Config ────────────────────────────────────────
 var SUPABASE_URL = 'https://greptxqtpepmzubnddog.supabase.co';
 var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyZXB0eHF0cGVwbXp1Ym5kZG9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMDM5NTQsImV4cCI6MjA5Njc3OTk1NH0.e2zi5vbibGBGPibnwAYy4uaVzZ1s_ItC5vQwEWp_sVE';
+
+// Backend API base URL.
+// - Local dev (servido por FastAPI): dejar vacio (mismo origen)
+// - GitHub Pages: poner la URL del backend deployado, ej:
+//     var BACKEND_URL = 'https://hope-monitor.onrender.com';
 var BACKEND_URL = '';
 var API = BACKEND_URL + '/api/servers';
 
@@ -868,6 +873,7 @@ function apiFetch(url, opts) {
   if (!opts) opts = {};
   if (!opts.headers) opts.headers = {};
   opts.headers['Authorization'] = 'Bearer ' + getToken();
+  // Prepend backend URL for non-absolute paths (GitHub Pages support)
   if (BACKEND_URL && url.indexOf('://') === -1) url = BACKEND_URL + url;
   if (opts.body && !(opts.body instanceof FormData) && !(opts.body instanceof URLSearchParams)) {
     if (!opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';

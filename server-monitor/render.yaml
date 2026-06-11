@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: hope-monitor-backend
+    runtime: python
+    repo: https://github.com/Demi1Codex/hope-server-monitor
+    branch: master
+    buildCommand: pip install -r server-monitor/requirements.txt
+    startCommand: cd server-monitor && python main.py
+    autoDeploy: true
+    envVars:
+      - key: SUPABASE_URL
+        value: https://greptxqtpepmzubnddog.supabase.co
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
