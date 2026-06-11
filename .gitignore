@@ -1,0 +1,8 @@
+.server_url
+BDautomatic/
+server-monitor/stderr.log
+server-monitor/stdout.log
+server-monitor/run_setup.py
+server-monitor/venv/
+server-monitor/__pycache__/
+server-monitor/*.pyc
