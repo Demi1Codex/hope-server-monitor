@@ -699,7 +699,18 @@ function restoreAuthForm() {
 }
 
 function authError(msg) {
-  document.getElementById('authError').textContent = msg;
+  document.getElementById('authError').textContent = typeof msg === 'string' ? msg : (msg && msg.message || 'Error desconocido');
+}
+
+function errMsg(e) {
+  if (typeof e === 'string') return e;
+  if (e && e.message) return e.message;
+  if (e && e.detail) {
+    if (typeof e.detail === 'string') return e.detail;
+    if (Array.isArray(e.detail)) return e.detail.map(function(x) { return x.msg || JSON.stringify(x); }).join('; ');
+    return JSON.stringify(e.detail);
+  }
+  try { return JSON.stringify(e); } catch(_) { return 'Error desconocido'; }
 }
 
 async function handleLogin() {
@@ -711,7 +722,7 @@ async function handleLogin() {
     var r = await _supabase.auth.signInWithPassword({ email: email, password: pass });
     if (r.error) throw new Error(r.error.message);
     await onAuthSuccess();
-  } catch(e) { authError(e.message); restoreAuthForm(); }
+  } catch(e) { authError(errMsg(e)); restoreAuthForm(); }
 }
 
 async function handleRegister() {
@@ -729,7 +740,7 @@ async function handleRegister() {
       return;
     }
     await onAuthSuccess();
-  } catch(e) { authError(e.message); restoreAuthForm(); }
+  } catch(e) { authError(errMsg(e)); restoreAuthForm(); }
 }
 
 async function handleLogout() {
@@ -811,11 +822,13 @@ async function init() {
 // ─── Toast ─────────────────────────────────────────
 function toast(msg, type) {
   var el = document.getElementById('toast');
-  el.textContent = msg;
+  el.textContent = typeof msg === 'string' ? msg : (msg && msg.message ? msg.message : String(msg));
   el.className = 'toast ' + type + ' show';
   clearTimeout(el._timer);
   el._timer = setTimeout(function() { el.classList.remove('show'); }, 3500);
 }
+
+function safeStr(v) { return typeof v === 'string' ? v : (v && v.message ? v.message : JSON.stringify(v)); }
 
 // ─── API ───────────────────────────────────────────
 function apiFetch(url, opts) {
@@ -1031,7 +1044,7 @@ function addServer() {
   })
   .then(function(r) { if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'Error'); }); return r.json(); })
   .then(function() { closeModal('addServerModal'); toast('Servidor añadido', 'success'); loadServers(); })
-  .catch(function(e) { toast('Error: ' + e.message, 'error'); });
+  .catch(function(e) { toast('Error: ' + errMsg(e), 'error'); });
 }
 
 // ─── Delete ────────────────────────────────────────
@@ -1199,7 +1212,7 @@ function sendShock() {
   })
   .catch(function(e) {
     resultLine.className = 'terminal-line error';
-    resultLine.textContent = 'Error de conexión: ' + e.message;
+    resultLine.textContent = 'Error de conexión: ' + errMsg(e);
     body.scrollTop = body.scrollHeight;
     input.disabled = false; input.focus();
     btn.disabled = false; btn.innerHTML = '↵ Enviar';
@@ -1245,7 +1258,7 @@ function saveShockConfig() {
     return r.json();
   })
   .then(function() { closeModal('shockConfigModal'); toast('Configuración guardada', 'success'); loadServers(); })
-  .catch(function(e) { toast('Error al guardar: ' + e.message, 'error'); });
+  .catch(function(e) { toast('Error al guardar: ' + errMsg(e), 'error'); });
 }
 
 function deleteShockConfig() {
@@ -1287,7 +1300,7 @@ function testShockConfig() {
     out.style.color = data.success ? 'var(--green)' : '#ef4444';
   })
   .catch(function(e) {
-    out.textContent = 'Error: ' + e.message;
+    out.textContent = 'Error: ' + errMsg(e);
     out.style.borderColor = '#ef4444';
     out.style.color = '#ef4444';
   });
@@ -1371,7 +1384,7 @@ async function acceptInvitation(token) {
       loadServers();
     } else {
       var e = await r.json();
-      toast('Error: ' + (e.detail || 'Invitación inválida'), 'error');
+      toast('Error: ' + errMsg(e), 'error');
     }
   } catch(e) {
     toast('Error al aceptar invitación', 'error');
@@ -1386,7 +1399,9 @@ function startPolling() {
 }
 
 // ─── Init ──────────────────────────────────────────
-init();
+init().catch(function(e) { console.error('Init error:', e); });
+
+window.onerror = function(msg) { toast('Error: ' + (typeof msg === 'string' ? msg : 'inesperado'), 'error'); return false; };
 
 // Close modals on overlay click
 document.querySelectorAll('.modal-overlay').forEach(function(el) {
