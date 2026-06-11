@@ -626,6 +626,9 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
+<!-- Error Debug -->
+<div id="errorDebug" style="position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff4444;font-size:12px;font-family:monospace;padding:8px;z-index:9999;max-height:120px;overflow:auto;display:none;border-top:1px solid #ff4444;"></div>
+
 <script>
 // ─── Config ────────────────────────────────────────
 var SUPABASE_URL = 'https://greptxqtpepmzubnddog.supabase.co';
@@ -635,8 +638,12 @@ var API = '/api/servers';
 // ─── Supabase ──────────────────────────────────────
 var _supabase = null;
 if (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== '{{SUPABASE_URL}}') {
-  _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  try {
+    _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    debugLog('Supabase client created');
+  } catch(e) { debugLog('Supabase init error: ' + errMsg(e)); }
 } else {
+  debugLog('SUPABASE placeholders not replaced, prompting...');
   _supabase = window.supabase.createClient(
     prompt('SUPABASE_URL:') || '',
     prompt('SUPABASE_ANON_KEY:') || ''
@@ -702,7 +709,17 @@ function authError(msg) {
   document.getElementById('authError').textContent = typeof msg === 'string' ? msg : (msg && msg.message || 'Error desconocido');
 }
 
+function debugLog(err) {
+  var dbg = document.getElementById('errorDebug');
+  if (!dbg) return;
+  dbg.style.display = 'block';
+  var text = typeof err === 'string' ? err : (err && err.message ? err.message : (err && err.code ? err.code + ': ' + (err.message || '') : JSON.stringify(err)));
+  dbg.innerHTML = (new Date().toLocaleTimeString()) + ' - ' + text + '<br>' + dbg.innerHTML;
+  if (dbg.children.length > 10) dbg.removeChild(dbg.lastChild);
+}
+
 function errMsg(e) {
+  debugLog(e);
   if (typeof e === 'string') return e;
   if (e && e.message) return e.message;
   if (e && e.detail) {
@@ -719,10 +736,12 @@ async function handleLogin() {
   if (!email || !pass) { authError('Completa todos los campos'); return; }
   setAuthLoading(true, 'Iniciando sesión...');
   try {
+    debugLog('Login attempt: ' + email);
     var r = await _supabase.auth.signInWithPassword({ email: email, password: pass });
+    debugLog('Login response: ' + JSON.stringify({error: r.error ? r.error.message : null, hasSession: !!r.data.session}));
     if (r.error) throw new Error(r.error.message);
     await onAuthSuccess();
-  } catch(e) { authError(errMsg(e)); restoreAuthForm(); }
+  } catch(e) { debugLog('Login catch: ' + (e && e.message || JSON.stringify(e))); authError(errMsg(e)); restoreAuthForm(); }
 }
 
 async function handleRegister() {
