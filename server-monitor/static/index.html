@@ -1,0 +1,1412 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hope Server Monitor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --border: #1e1e2e;
+    --green: #00ff41;
+    --blue: #00d4ff;
+    --muted: #6b7280;
+    --text: #e5e7eb;
+    --radius: 24px;
+    --transition: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,255,65,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,255,65,0.03) 1px, transparent 1px),
+      linear-gradient(rgba(0,212,255,0.02) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.02) 1px, transparent 1px);
+    background-size: 60px 60px, 60px 60px, 30px 30px, 30px 30px;
+    pointer-events: none;
+    z-index: 0;
+  }
+  .container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px 32px;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ─── Auth ─── */
+  #auth-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+  }
+  .auth-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    width: 400px;
+    max-width: 90vw;
+  }
+  .auth-card h1 {
+    font-size: 28px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--green), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .auth-card .sub {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 28px;
+  }
+  .auth-card .auth-error {
+    color: #ef4444;
+    font-size: 13px;
+    text-align: center;
+    margin-bottom: 12px;
+    min-height: 20px;
+  }
+  .auth-card label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.6);
+    margin-bottom: 6px;
+  }
+  .auth-card input {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    margin-bottom: 16px;
+    transition: border-color 0.3s;
+  }
+  .auth-card input:focus {
+    outline: none;
+    border-color: var(--green);
+    box-shadow: 0 0 12px rgba(0,255,65,0.1);
+  }
+  .auth-card .auth-toggle {
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 16px;
+  }
+  .auth-card .auth-toggle a {
+    color: var(--blue);
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .auth-card .auth-toggle a:hover { text-decoration: underline; }
+
+  /* ─── Header ─── */
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .logo {
+    font-size: 24px;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--green), var(--blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
+  }
+  .header-left { display: flex; align-items: center; gap: 16px; }
+  .header-right { display: flex; align-items: center; gap: 12px; }
+  .header-email { font-size: 13px; color: var(--muted); }
+  .header-count { font-size: 14px; color: var(--muted); font-weight: 500; }
+
+  .btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s var(--transition);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--green), #00cc34);
+    color: #000;
+    box-shadow: 0 0 20px rgba(0,255,65,0.2);
+  }
+  .btn-primary:hover { box-shadow: 0 0 30px rgba(0,255,65,0.4); transform: translateY(-1px); }
+  .btn-full { width: 100%; justify-content: center; padding: 12px; }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn-outline:hover { border-color: var(--green); color: var(--green); }
+  .btn-shock {
+    background: transparent;
+    border: 1px solid #ff6b35;
+    color: #ff6b35;
+    box-shadow: 0 0 10px rgba(255,107,53,0.1);
+  }
+  .btn-shock:hover { background: rgba(255,107,53,0.1); box-shadow: 0 0 20px rgba(255,107,53,0.3); }
+  .btn-danger {
+    background: transparent;
+    border: 1px solid #ef4444;
+    color: #ef4444;
+  }
+  .btn-danger:hover { background: rgba(239,68,68,0.1); }
+  .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+  .btn-xs { padding: 4px 8px; font-size: 11px; border-radius: 6px; }
+
+  /* ─── Grid ─── */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px;
+  }
+  @media (max-width: 900px) {
+    .container { padding: 16px; }
+    .grid { grid-template-columns: 1fr; }
+    .header { flex-direction: column; align-items: flex-start; }
+    .header-left { width: 100%; justify-content: space-between; }
+    .header-right { width: 100%; justify-content: flex-end; }
+  }
+
+  /* ─── Card ─── */
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 24px;
+    cursor: pointer;
+    transition: all 0.5s var(--transition);
+    overflow: hidden;
+  }
+  .card:hover { border-color: rgba(255,255,255,0.08); }
+  .card.selected { transform: scale(1.02); }
+  .card.active { box-shadow: 0 0 15px rgba(0,255,65,0.08); }
+  .card.active.selected { border-color: var(--green); box-shadow: 0 0 40px rgba(0,255,65,0.25), 0 0 80px rgba(0,255,65,0.08); }
+  .card.inactive { box-shadow: 0 0 15px rgba(0,212,255,0.08); }
+  .card.inactive.selected { border-color: var(--blue); box-shadow: 0 0 40px rgba(0,212,255,0.25), 0 0 80px rgba(0,212,255,0.08); }
+
+  .card-glow-line {
+    position: absolute; top: 0; left: 0; width: 100%; height: 2px; opacity: 0; transition: opacity 0.3s;
+  }
+  .card-glow-line.animating { opacity: 1; }
+  .card-glow-line::after {
+    content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+    background: linear-gradient(90deg, transparent, var(--card-glow-color), transparent);
+    animation: glowSweep 0.8s ease-out forwards;
+  }
+  @keyframes glowSweep { 0% { left: -100%; } 100% { left: 200%; } }
+  .sel-indicator {
+    position: absolute; top: 12px; right: 12px; width: 10px; height: 10px; border-radius: 50%;
+    opacity: 0; transform: scale(0); transition: all 0.4s var(--transition);
+  }
+  .card.selected .sel-indicator {
+    opacity: 1; transform: scale(1); background: var(--card-glow-color);
+    box-shadow: 0 0 12px var(--card-glow-color);
+    animation: selPulse 1.5s ease-in-out infinite;
+  }
+  @keyframes selPulse { 0%,100% { box-shadow: 0 0 8px var(--card-glow-color); } 50% { box-shadow: 0 0 20px var(--card-glow-color); } }
+  .ring-burst {
+    position: absolute; top: 50%; left: 50%; width: 0; height: 0; border-radius: 50%;
+    border: 2px solid var(--card-glow-color); pointer-events: none; opacity: 0; z-index: 5;
+  }
+  .ring-burst.animating { animation: ringExpand 0.8s ease-out forwards; }
+  @keyframes ringExpand { 0% { width:0;height:0;opacity:1; } 100% { width:600px;height:600px;opacity:0; } }
+  .particle-container { position: absolute; inset: 0; pointer-events: none; overflow: visible; z-index: 4; }
+  .particle { position: absolute; width: 4px; height: 4px; border-radius: 50%; opacity: 0; pointer-events: none; }
+  .particle.animating { animation: particleBurst var(--dur) cubic-bezier(0.22,1,0.36,1) forwards; }
+  @keyframes particleBurst { 0% { opacity:1;transform:translate(0,0)scale(1); } 100% { opacity:0;transform:translate(var(--tx),var(--ty))scale(0); } }
+
+  .card-badge {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 0.8px; padding: 4px 10px; border-radius: 20px; margin-bottom: 12px;
+  }
+  .card-badge.green { color: var(--green); background: rgba(0,255,65,0.08); border: 1px solid rgba(0,255,65,0.2); }
+  .card-badge.green::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .card-badge.blue { color: var(--blue); background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.2); }
+  .card-badge.blue::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--blue); box-shadow: 0 0 6px var(--blue); }
+  .card-badge.gray { color: var(--muted); background: rgba(107,114,128,0.08); border: 1px solid rgba(107,114,128,0.2); }
+  .card-badge.gray::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .role-badge {
+    font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 6px; margin-left: 6px;
+  }
+  .role-badge.owner { background: rgba(0,255,65,0.1); color: var(--green); border: 1px solid rgba(0,255,65,0.2); }
+  .role-badge.admin { background: rgba(0,212,255,0.1); color: var(--blue); border: 1px solid rgba(0,212,255,0.2); }
+  .role-badge.viewer { background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.4); border: 1px solid rgba(255,255,255,0.1); }
+  .type-badge {
+    font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+    padding: 2px 8px; border-radius: 6px; margin-left: 6px;
+    background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.5);
+  }
+
+  .card-title { font-size: 20px; font-weight: 700; margin-bottom: 4px; letter-spacing: -0.3px; }
+  .card-title .subtitle { font-size: 14px; font-weight: 400; color: var(--muted); margin-left: 8px; }
+
+  .chart-mini {
+    display: flex; align-items: flex-end; gap: 3px; height: 48px; margin: 16px 0; padding: 0 2px;
+  }
+  .chart-bar { flex: 1; border-radius: 2px 2px 0 0; transition: all 0.5s var(--transition); min-height: 4px; }
+  .chart-bar.green-bar { background: var(--green); }
+  .chart-bar.blue-bar { background: var(--blue); }
+  .chart-bar.glow { box-shadow: 0 0 8px var(--bar-glow); animation: barGlow 0.6s ease-out; }
+  @keyframes barGlow { 0%{box-shadow:0 0 0 transparent} 50%{box-shadow:0 0 16px var(--bar-glow)} 100%{box-shadow:0 0 8px var(--bar-glow)} }
+
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .stat { display: flex; flex-direction: column; gap: 2px; }
+  .stat-value { font-size: 18px; font-weight: 700; color: var(--text); }
+  .stat-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .activity { margin: 12px 0; display: flex; flex-direction: column; gap: 6px; }
+  .activity-empty { font-size: 12px; color: var(--muted); font-style: italic; }
+  .activity-item { display: flex; align-items: flex-start; gap: 8px; font-size: 12px; color: rgba(255,255,255,0.6); line-height: 1.4; }
+  .activity-dot { flex-shrink: 0; width: 5px; height: 5px; border-radius: 50%; margin-top: 5px; }
+  .activity-dot.critical { background: #ef4444; box-shadow: 0 0 4px #ef4444; }
+  .activity-dot.high { background: #f97316; box-shadow: 0 0 4px #f97316; }
+  .activity-dot.medium { background: #eab308; box-shadow: 0 0 4px #eab308; }
+  .activity-dot.low { background: var(--green); box-shadow: 0 0 4px var(--green); }
+  .activity-time { font-size: 10px; color: rgba(255,255,255,0.3); margin-left: auto; flex-shrink: 0; }
+
+  .card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .card-actions .spacer { margin-left: auto; }
+
+  .empty-state { text-align: center; padding: 80px 20px; color: var(--muted); max-width: 600px; margin: 0 auto; }
+  .empty-state svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.3; }
+  .empty-state h3 { font-size: 20px; font-weight: 600; margin-bottom: 8px; color: rgba(255,255,255,0.4); }
+  .empty-state p { font-size: 14px; margin-bottom: 20px; }
+
+  /* ─── Modal ─── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(8px); z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.3s var(--transition);
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 32px; width: 90%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+    transform: scale(0.95); transition: transform 0.3s var(--transition);
+  }
+  .modal-overlay.open .modal { transform: scale(1); }
+  .modal h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .modal p { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+  .modal label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; color: rgba(255,255,255,0.7); }
+  .modal input, .modal select, .modal textarea {
+    width: 100%; padding: 12px 16px; background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border); border-radius: 12px; color: var(--text);
+    font-family: 'Inter', sans-serif; font-size: 14px;
+    transition: border-color 0.3s; margin-bottom: 16px;
+  }
+  .modal input:focus, .modal select:focus, .modal textarea:focus {
+    outline: none; border-color: var(--green); box-shadow: 0 0 12px rgba(0,255,65,0.1);
+  }
+  .modal textarea { resize: vertical; min-height: 80px; font-family: 'Consolas','Courier New',monospace; font-size: 13px; }
+  .modal select option { background: var(--surface); color: var(--text); }
+  .modal-actions { display: flex; gap: 12px; justify-content: flex-end; margin-top: 8px; }
+
+  /* ─── Share Modal ─── */
+  .share-link-box {
+    display: flex; gap: 8px; align-items: center;
+    background: rgba(255,255,255,0.03); border: 1px solid var(--border);
+    border-radius: 12px; padding: 8px 12px; margin-bottom: 16px;
+  }
+  .share-link-box input {
+    flex: 1; background: transparent; border: none; color: var(--text);
+    font-family: 'Consolas', monospace; font-size: 12px; margin: 0; padding: 0;
+  }
+  .share-link-box input:focus { outline: none; }
+  .collab-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+  .collab-item {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: rgba(255,255,255,0.02); border-radius: 10px;
+  }
+  .collab-item-info { display: flex; align-items: center; gap: 10px; }
+  .collab-item-email { font-size: 14px; }
+  .collab-item-role { font-size: 11px; padding: 2px 8px; border-radius: 6px; background: rgba(0,212,255,0.1); color: var(--blue); }
+
+  /* ─── Terminal ─── */
+  .terminal {
+    background: #0a0a0f; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; margin-bottom: 16px;
+  }
+  .terminal-header {
+    display: flex; align-items: center; gap: 8px; padding: 10px 16px;
+    background: rgba(255,255,255,0.03); border-bottom: 1px solid var(--border);
+  }
+  .terminal-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .terminal-dot.red { background: #ff5f57; }
+  .terminal-dot.yellow { background: #ffbd2e; }
+  .terminal-dot.green { background: #28c840; }
+  .terminal-title { font-size: 12px; color: var(--muted); margin-left: 8px; font-family: 'Consolas','Courier New',monospace; }
+  .terminal-body { padding: 12px 16px; min-height: 60px; max-height: 200px; overflow-y: auto; font-family: 'Consolas','Courier New',monospace; font-size: 13px; line-height: 1.6; }
+  .terminal-line { white-space: pre-wrap; word-break: break-all; }
+  .terminal-line.muted { color: var(--muted); }
+  .terminal-line.output { color: var(--text); }
+  .terminal-line.success { color: var(--green); }
+  .terminal-line.error { color: #ff5f57; }
+  .terminal-line.prompt { color: var(--green); }
+  .terminal-line .host-highlight { color: var(--blue); }
+  .terminal-input-line { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-top: 1px solid var(--border); background: rgba(0,0,0,0.3); }
+  .terminal-prompt { font-family: 'Consolas','Courier New',monospace; font-size: 13px; color: var(--green); white-space: nowrap; flex-shrink: 0; }
+  .terminal-input { flex: 1; background: transparent; border: none; color: var(--text); font-family: 'Consolas','Courier New',monospace; font-size: 13px; outline: none; padding: 4px 0; }
+  .terminal-input::placeholder { color: rgba(255,255,255,0.2); }
+
+  .shock-config-info { font-size: 12px; padding: 6px 12px; border-radius: 8px; background: rgba(0,212,255,0.08); border: 1px solid rgba(0,212,255,0.15); color: var(--blue); margin-bottom: 12px; }
+  .shock-config-info.hidden { display: none; }
+  .shock-config-info code { font-family: 'Consolas',monospace; font-size: 11px; background: rgba(255,255,255,0.05); padding: 1px 6px; border-radius: 4px; }
+  .shock-output { background: #000; border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; margin-top: 12px; font-family: 'Consolas','Courier New',monospace; font-size: 12px; line-height: 1.5; white-space: pre-wrap; max-height: 200px; overflow-y: auto; display: none; }
+  .shock-output.show { display: block; }
+  .shock-output.success { border-color: var(--green); color: var(--green); }
+  .shock-output.error { border-color: #ef4444; color: #ef4444; }
+  .shock-spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid rgba(255,107,53,0.3); border-top-color: #ff6b35; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .config-badge { font-size: 11px; padding: 4px 10px; border-radius: 20px; background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.25); color: var(--blue); font-weight: 500; letter-spacing: 0.3px; transition: opacity 0.3s; }
+  .config-badge.hidden { opacity: 0; pointer-events: none; }
+
+  .toast {
+    position: fixed; bottom: 24px; right: 24px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 12px; padding: 12px 20px;
+    font-size: 14px; z-index: 200; transform: translateY(120px); opacity: 0;
+    transition: all 0.4s var(--transition); display: flex; align-items: center; gap: 10px;
+  }
+  .toast.show { transform: translateY(0); opacity: 1; }
+  .toast.success { border-color: var(--green); box-shadow: 0 0 20px rgba(0,255,65,0.1); }
+  .toast.error { border-color: #ef4444; box-shadow: 0 0 20px rgba(239,68,68,0.1); }
+  .toast.info { border-color: var(--blue); box-shadow: 0 0 20px rgba(0,212,255,0.1); }
+
+  .history-list { display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; }
+  .history-item { padding: 12px 16px; background: rgba(255,255,255,0.02); border-radius: 12px; border-left: 3px solid var(--muted); }
+  .history-item.critical { border-left-color: #ef4444; }
+  .history-item.high { border-left-color: #f97316; }
+  .history-item.medium { border-left-color: #eab308; }
+  .history-item.low { border-left-color: var(--green); }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ AUTH ═══════════════ -->
+<div id="auth-section">
+  <div class="auth-card">
+    <h1>Hope Monitor</h1>
+    <p class="sub" id="authSubtitle">Inicia sesión para continuar</p>
+    <div class="auth-error" id="authError"></div>
+
+    <div id="loginForm">
+      <label>Email</label>
+      <input type="email" id="loginEmail" placeholder="tu@email.com" autocomplete="email">
+      <label>Contraseña</label>
+      <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password">
+      <button class="btn btn-primary btn-full" onclick="handleLogin()">Iniciar sesión</button>
+      <div class="auth-toggle">¿No tienes cuenta? <a onclick="showRegister()">Registrarse</a></div>
+    </div>
+
+    <div id="registerForm" class="hidden">
+      <label>Email</label>
+      <input type="email" id="regEmail" placeholder="tu@email.com" autocomplete="email">
+      <label>Contraseña</label>
+      <input type="password" id="regPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password">
+      <button class="btn btn-primary btn-full" onclick="handleRegister()">Crear cuenta</button>
+      <div class="auth-toggle">¿Ya tienes cuenta? <a onclick="showLogin()">Iniciar sesión</a></div>
+    </div>
+
+    <div id="authLoading" class="hidden" style="text-align:center;padding:20px">
+      <div class="shock-spinner"></div>
+      <div style="margin-top:12px;color:var(--muted);font-size:14px" id="authLoadingMsg">Procesando...</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ APP ═══════════════ -->
+<div id="app-section" class="hidden">
+<div class="container">
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-left">
+      <span class="logo">Hope Monitor</span>
+      <span class="header-email" id="headerEmail"></span>
+      <span class="config-badge hidden" id="configBadge">⚙️ Config personalizada</span>
+    </div>
+    <div class="header-right">
+      <span class="header-count" id="navCount">0 servidores</span>
+      <button class="btn btn-primary" onclick="openAddServer()">+ Añadir</button>
+      <button class="btn btn-outline btn-sm" onclick="handleLogout()">Salir</button>
+    </div>
+  </header>
+
+  <!-- Empty State -->
+  <div class="empty-state" id="emptyState">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
+      <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+    </svg>
+    <h3>No hay servidores</h3>
+    <p>Añade tu primer servidor, web o API para empezar a monitorear.</p>
+    <button class="btn btn-primary" onclick="openAddServer()">Añadir</button>
+  </div>
+
+  <!-- Grid -->
+  <div class="grid" id="serversGrid"></div>
+
+</div>
+</div>
+
+<!-- ═══════════════ MODALS ═══════════════ -->
+
+<!-- Add Server -->
+<div class="modal-overlay" id="addServerModal">
+  <div class="modal">
+    <h2>Nuevo servidor</h2>
+    <p>Registra un servidor, web o API para monitorear.</p>
+    <label>Nombre</label>
+    <input type="text" id="addName" placeholder="Ej: Servidor Principal">
+    <label>IP / URL</label>
+    <input type="text" id="addTarget" placeholder="Ej: 192.168.1.10 o https://ejemplo.com">
+    <label>Tipo</label>
+    <select id="addType">
+      <option value="server">Servidor (ICMP Ping)</option>
+      <option value="web">Web (HTTP GET)</option>
+      <option value="api">API (HTTP GET)</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('addServerModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="addServer()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Change -->
+<div class="modal-overlay" id="addChangeModal">
+  <div class="modal">
+    <h2>Registrar cambio</h2>
+    <p id="changeServerName"></p>
+    <label>Título</label>
+    <input type="text" id="changeTitle" placeholder="Ej: Actualización de kernel">
+    <label>Descripción</label>
+    <input type="text" id="changeDesc" placeholder="Opcional">
+    <label>Severidad</label>
+    <select id="changeSeverity">
+      <option value="low">Baja</option>
+      <option value="medium">Media</option>
+      <option value="high">Alta</option>
+      <option value="critical">Crítica</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('addChangeModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="addChange()">Registrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- History -->
+<div class="modal-overlay" id="historyModal">
+  <div class="modal">
+    <h2>Historial de cambios</h2>
+    <p id="historyServerName"></p>
+    <div class="history-list" id="historyList"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('historyModal')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shock Terminal -->
+<div class="modal-overlay" id="shockModal">
+  <div class="modal" style="max-width:640px">
+    <h2>⚡ Shock — Terminal remota</h2>
+    <p id="shockServerName">Conectando automáticamente al servidor.</p>
+    <div id="shockConfigInfo" class="shock-config-info hidden"></div>
+    <div class="terminal" id="shockTerminal">
+      <div class="terminal-header">
+        <span class="terminal-dot red"></span>
+        <span class="terminal-dot yellow"></span>
+        <span class="terminal-dot green"></span>
+        <span class="terminal-title" id="shockTermTitle">root@host</span>
+      </div>
+      <div class="terminal-body" id="shockTermBody">
+        <div class="terminal-line muted">Conectando a <span class="host-highlight" id="shockHostDisplay">---</span>...</div>
+        <div class="terminal-line muted">Listo. Escribe un comando:</div>
+      </div>
+      <div class="terminal-input-line">
+        <span class="terminal-prompt" id="shockPrompt">root@host:~$</span>
+        <input type="text" class="terminal-input" id="shockCommand" placeholder="Escribe un comando y presiona Enter" autocomplete="off" spellcheck="false">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('shockModal')">Cerrar</button>
+      <button class="btn btn-shock" id="shockSendBtn" onclick="sendShock()">↵ Enviar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Shock Config -->
+<div class="modal-overlay" id="shockConfigModal">
+  <div class="modal" style="max-width:700px">
+    <h2>⚙️ Configuración de conexión</h2>
+    <p id="shockConfigServerName">Define cómo conectar a este servidor.</p>
+    <label>Código Python (función <code>run(host, command)</code>)</label>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('shockConfigFile').click()">📂 Importar .py</button>
+      <button class="btn btn-outline btn-sm" onclick="testShockConfig(false)">▶ Probar</button>
+      <button class="btn btn-danger btn-sm" onclick="deleteShockConfig()">🗑 Restaurar default</button>
+    </div>
+    <input type="file" id="shockConfigFile" accept=".py" style="display:none" onchange="loadShockConfigFile(event)">
+    <textarea id="shockConfigCode" rows="12" style="font-family:'Consolas','Courier New',monospace;font-size:12px;line-height:1.5" placeholder="# Define tu función run(host, command) aquí&#10;# o importa un archivo .py"></textarea>
+    <div class="shock-output" id="shockConfigTestOutput"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('shockConfigModal')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveShockConfig()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Share -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal" style="max-width:560px">
+    <h2>🔗 Compartir servidor</h2>
+    <p id="shareServerName">Invita a otras personas a supervisar este servidor.</p>
+    <label>Enlace de invitación (válido 7 días)</label>
+    <div class="share-link-box">
+      <input type="text" id="shareLink" readonly value="— Genera un enlace primero —">
+      <button class="btn btn-outline btn-sm" onclick="copyShareLink()">Copiar</button>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:16px">
+      <button class="btn btn-primary btn-sm" onclick="generateInvite()">🔄 Generar nuevo enlace</button>
+    </div>
+    <label>Colaboradores actuales</label>
+    <div class="collab-list" id="collabList">
+      <div style="color:var(--muted);font-size:13px">Cargando...</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal('shareModal')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Config ────────────────────────────────────────
+var SUPABASE_URL = 'https://greptxqtpepmzubnddog.supabase.co';
+var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyZXB0eHF0cGVwbXp1Ym5kZG9nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyMDM5NTQsImV4cCI6MjA5Njc3OTk1NH0.e2zi5vbibGBGPibnwAYy4uaVzZ1s_ItC5vQwEWp_sVE';
+var API = '/api/servers';
+
+// ─── Supabase ──────────────────────────────────────
+var _supabase = null;
+if (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== '{{SUPABASE_URL}}') {
+  _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+} else {
+  _supabase = window.supabase.createClient(
+    prompt('SUPABASE_URL:') || '',
+    prompt('SUPABASE_ANON_KEY:') || ''
+  );
+}
+
+// ─── State ─────────────────────────────────────────
+var servers = [];
+var selectedId = null;
+var shockServerId = null;
+var changeServerId = null;
+var shockConfigServerId = null;
+var shareServerId = null;
+var inviteToken = null;
+var session = null;
+var authMode = 'login'; // 'login' or 'register'
+
+// ─── Auth ──────────────────────────────────────────
+function getToken() {
+  return session ? session.access_token : null;
+}
+
+function authHeaders() {
+  var t = getToken();
+  return t ? { 'Authorization': 'Bearer ' + t, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
+}
+
+function showLogin() {
+  authMode = 'login';
+  document.getElementById('loginForm').classList.remove('hidden');
+  document.getElementById('registerForm').classList.add('hidden');
+  document.getElementById('authSubtitle').textContent = 'Inicia sesión para continuar';
+  document.getElementById('authError').textContent = '';
+}
+
+function showRegister() {
+  authMode = 'register';
+  document.getElementById('loginForm').classList.add('hidden');
+  document.getElementById('registerForm').classList.remove('hidden');
+  document.getElementById('authSubtitle').textContent = 'Crea una cuenta gratuita';
+  document.getElementById('authError').textContent = '';
+}
+
+function setAuthLoading(loading, msg) {
+  document.getElementById('loginForm').classList.toggle('hidden', loading);
+  document.getElementById('registerForm').classList.toggle('hidden', loading);
+  document.getElementById('authLoading').classList.toggle('hidden', !loading);
+  if (msg) document.getElementById('authLoadingMsg').textContent = msg;
+}
+
+function restoreAuthForm() {
+  document.getElementById('authLoading').classList.add('hidden');
+  if (authMode === 'login') {
+    document.getElementById('loginForm').classList.remove('hidden');
+    document.getElementById('registerForm').classList.add('hidden');
+  } else {
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('registerForm').classList.remove('hidden');
+  }
+}
+
+function authError(msg) {
+  document.getElementById('authError').textContent = msg;
+}
+
+async function handleLogin() {
+  var email = document.getElementById('loginEmail').value.trim();
+  var pass = document.getElementById('loginPassword').value;
+  if (!email || !pass) { authError('Completa todos los campos'); return; }
+  setAuthLoading(true, 'Iniciando sesión...');
+  try {
+    var r = await _supabase.auth.signInWithPassword({ email: email, password: pass });
+    if (r.error) throw new Error(r.error.message);
+    await onAuthSuccess();
+  } catch(e) { authError(e.message); restoreAuthForm(); }
+}
+
+async function handleRegister() {
+  var email = document.getElementById('regEmail').value.trim();
+  var pass = document.getElementById('regPassword').value;
+  if (!email || !pass) { authError('Completa todos los campos'); return; }
+  if (pass.length < 6) { authError('La contraseña debe tener al menos 6 caracteres'); return; }
+  setAuthLoading(true, 'Creando cuenta...');
+  try {
+    var r = await _supabase.auth.signUp({ email: email, password: pass });
+    if (r.error) throw new Error(r.error.message);
+    if (r.data.user && r.data.user.identities && r.data.user.identities.length === 0) {
+      authError('Este email ya está registrado. Inicia sesión.');
+      showLogin();
+      return;
+    }
+    await onAuthSuccess();
+  } catch(e) { authError(e.message); restoreAuthForm(); }
+}
+
+async function handleLogout() {
+  await _supabase.auth.signOut();
+  session = null;
+  document.getElementById('app-section').classList.add('hidden');
+  document.getElementById('auth-section').classList.remove('hidden');
+  showLogin();
+}
+
+async function onAuthSuccess() {
+  var s = await _supabase.auth.getSession();
+  session = s.data.session;
+  if (!session) {
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('registerForm').classList.add('hidden');
+    document.getElementById('authLoading').classList.add('hidden');
+    document.getElementById('authSubtitle').textContent = 'Revisa tu email';
+    document.getElementById('authError').innerHTML = 'Te enviamos un link de confirmación a <b>' + document.getElementById('regEmail').value + '</b>. Hacé clic en el link y luego iniciá sesión.';
+    return;
+  }
+  document.getElementById('headerEmail').textContent = session.user.email;
+  document.getElementById('auth-section').classList.add('hidden');
+  document.getElementById('app-section').classList.remove('hidden');
+  document.getElementById('authLoading').classList.add('hidden');
+
+  // Handle pending invitation
+  var params = new URLSearchParams(window.location.search);
+  var invToken = params.get('invite');
+  if (invToken) {
+    await acceptInvitation(invToken);
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+
+  checkShockConfig();
+  loadServers();
+  startPolling();
+}
+
+// ─── Initialization ────────────────────────────────
+async function init() {
+  var s = await _supabase.auth.getSession();
+  if (s.data.session) {
+    session = s.data.session;
+    document.getElementById('headerEmail').textContent = session.user.email;
+    document.getElementById('auth-section').classList.add('hidden');
+    document.getElementById('app-section').classList.remove('hidden');
+
+    var params = new URLSearchParams(window.location.search);
+    var invToken = params.get('invite');
+    if (invToken) {
+      await acceptInvitation(invToken);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    checkShockConfig();
+    loadServers();
+    startPolling();
+  } else {
+    document.getElementById('auth-section').classList.remove('hidden');
+    document.getElementById('app-section').classList.add('hidden');
+    showLogin();
+
+    var params = new URLSearchParams(window.location.search);
+    if (params.get('invite')) {
+      document.getElementById('authSubtitle').textContent = 'Inicia sesión para aceptar la invitación';
+    }
+  }
+
+  // Enter key on auth forms
+  document.getElementById('loginPassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') handleLogin();
+  });
+  document.getElementById('regPassword').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') handleRegister();
+  });
+}
+
+// ─── Toast ─────────────────────────────────────────
+function toast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast ' + type + ' show';
+  clearTimeout(el._timer);
+  el._timer = setTimeout(function() { el.classList.remove('show'); }, 3500);
+}
+
+// ─── API ───────────────────────────────────────────
+function apiFetch(url, opts) {
+  if (!opts) opts = {};
+  if (!opts.headers) opts.headers = {};
+  opts.headers['Authorization'] = 'Bearer ' + getToken();
+  if (opts.body && typeof opts.body === 'object' && !(opts.body instanceof FormData)) {
+    if (!opts.headers['Content-Type']) opts.headers['Content-Type'] = 'application/json';
+  }
+  return fetch(url, opts);
+}
+
+// ─── Load ──────────────────────────────────────────
+function checkShockConfig() {
+  apiFetch('/api/shock-config-status')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var badge = document.getElementById('configBadge');
+      if (badge) badge.classList.toggle('hidden', !data.custom);
+    })
+    .catch(function() {});
+}
+
+function loadServers() {
+  apiFetch(API)
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) {
+      servers = data;
+      renderCards();
+    })
+    .catch(function(e) {});
+}
+
+// ─── Render ────────────────────────────────────────
+function renderCards() {
+  var grid = document.getElementById('serversGrid');
+  var empty = document.getElementById('emptyState');
+
+  if (servers.length === 0) {
+    grid.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    document.getElementById('navCount').textContent = '0 servidores';
+    return;
+  }
+  if (empty) empty.style.display = 'none';
+  document.getElementById('navCount').textContent = servers.length + ' servidores';
+
+  var html = '';
+  for (var i = 0; i < servers.length; i++) {
+    var s = servers[i];
+    var isActive = s.status === 'active';
+    var isInactive = s.status === 'inactive';
+    var isSelected = s.id === selectedId;
+    var cardClass = 'card';
+    if (isActive) cardClass += ' active';
+    if (isInactive) cardClass += ' inactive';
+    if (isSelected) cardClass += ' selected';
+
+    var color = isActive ? 'var(--green)' : (isInactive ? 'var(--blue)' : 'var(--muted)');
+    var glowColor = isActive ? '#00ff41' : (isInactive ? '#00d4ff' : '#6b7280');
+    var statusLabel = isActive ? 'Activo' : (isInactive ? 'Desconectado' : 'Desconocido');
+    var badgeClass = isActive ? 'green' : (isInactive ? 'blue' : 'gray');
+
+    var lastCheck = s.last_checked ? timeAgo(s.last_checked) : 'Nunca';
+    var role = s._role || 'owner';
+    var isCollab = s._collab || false;
+    var roleLabel = role === 'owner' ? 'Propietario' : (role === 'admin' ? 'Admin' : 'Lector');
+    var roleClass = role === 'owner' ? 'owner' : (role === 'admin' ? 'admin' : 'viewer');
+    var canWrite = role === 'owner' || role === 'admin';
+
+    var chartBars = '';
+    var barColors = isActive ? 'green-bar' : (isInactive ? 'blue-bar' : '');
+    var barGlow = isActive ? '#00ff41' : '#00d4ff';
+    for (var b = 0; b < 20; b++) {
+      var h = 4 + Math.round(Math.random() * 44);
+      chartBars += '<div class="chart-bar ' + barColors + '" style="height:' + h + 'px" data-glow="' + barGlow + '"></div>';
+    }
+
+    var activityHtml = '';
+    if (s.changes && s.changes.length > 0) {
+      var maxShow = Math.min(3, s.changes.length);
+      for (var c = 0; c < maxShow; c++) {
+        var ch = s.changes[c];
+        activityHtml += '<div class="activity-item"><span class="activity-dot ' + ch.severity + '"></span>' +
+          escapeHtml(ch.title) + '<span class="activity-time">' + timeAgo(ch.timestamp) + '</span></div>';
+      }
+    } else {
+      activityHtml = '<div class="activity-empty">Sin cambios registrados</div>';
+    }
+
+    var actions = '';
+
+    actions += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openHistory(\'' + s.id + '\')">Historial</button>';
+
+    if (canWrite) {
+      actions += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openChange(\'' + s.id + '\', \'' + escapeHtml(s.name) + '\')">+Cambio</button>';
+    }
+    actions += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();checkNow(\'' + s.id + '\')">Ping</button>';
+
+    if (canWrite) {
+      if (isCollab) {
+        actions += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openShockConfig(\'' + s.id + '\')" title="Configurar conexión">⚙️</button>';
+      }
+      actions += '<button class="btn btn-shock btn-sm" onclick="event.stopPropagation();openShock(\'' + s.id + '\', \'' + escapeHtml(s.name) + '\')">⚡Shock</button>';
+    }
+
+    if (role === 'owner') {
+      actions += '<span class="spacer"></span>';
+      actions += '<button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openShare(\'' + s.id + '\', \'' + escapeHtml(s.name) + '\')">🔗</button>';
+      actions += '<button class="btn btn-danger btn-sm" onclick="event.stopPropagation();deleteServer(\'' + s.id + '\')">Eliminar</button>';
+    }
+
+    html += '<div class="' + cardClass + '" data-id="' + s.id + '" onclick="selectCard(\'' + s.id + '\', event)">' +
+      '<span class="card-glow-line" style="--card-glow-color:' + color + '"></span>' +
+      '<span class="ring-burst" style="--card-glow-color:' + color + '"></span>' +
+      '<div class="particle-container" id="particles-' + s.id + '"></div>' +
+      '<span class="sel-indicator" style="--card-glow-color:' + color + '"></span>' +
+      '<span class="card-badge ' + badgeClass + '">' + statusLabel + '<span class="type-badge">' + s.type + '</span><span class="role-badge ' + roleClass + '">' + roleLabel + '</span></span>' +
+      '<div class="card-title">' + escapeHtml(s.name) + '<span class="subtitle">' + escapeHtml(s.target) + '</span></div>' +
+      '<div class="chart-mini">' + chartBars + '</div>' +
+      '<div class="stats">' +
+        '<div class="stat"><span class="stat-value">' + statusLabel + '</span><span class="stat-label">Estado</span></div>' +
+        '<div class="stat"><span class="stat-value">' + lastCheck + '</span><span class="stat-label">Últ. revisión</span></div>' +
+        '<div class="stat"><span class="stat-value">' + (s.changes ? s.changes.length : 0) + '</span><span class="stat-label">Cambios</span></div>' +
+        '<div class="stat"><span class="stat-value">' + s.type.toUpperCase() + '</span><span class="stat-label">Tipo</span></div>' +
+      '</div>' +
+      '<div class="activity">' + activityHtml + '</div>' +
+      '<div class="card-actions" onclick="event.stopPropagation()">' + actions + '</div>' +
+    '</div>';
+  }
+  grid.innerHTML = html;
+}
+
+// ─── Card Selection ────────────────────────────────
+function selectCard(id, event) {
+  if (event) event.stopPropagation();
+  if (selectedId === id) return;
+  selectedId = id;
+  renderCards();
+  animateCard(id);
+}
+
+function animateCard(id) {
+  var card = document.querySelector('.card[data-id="' + id + '"]');
+  if (!card) return;
+  var s = servers.find(function(x) { return x.id === id; });
+  if (!s) return;
+  var isActive = s.status === 'active';
+  var glowColor = isActive ? '#00ff41' : (s.status === 'inactive' ? '#00d4ff' : '#6b7280');
+  var glowLine = card.querySelector('.card-glow-line');
+  if (glowLine) { glowLine.classList.remove('animating'); void glowLine.offsetWidth; glowLine.classList.add('animating'); }
+  var ring = card.querySelector('.ring-burst');
+  if (ring) { ring.classList.remove('animating'); void ring.offsetWidth; ring.classList.add('animating'); }
+  var pContainer = card.querySelector('.particle-container');
+  if (pContainer) {
+    pContainer.innerHTML = '';
+    for (var i = 0; i < 24; i++) {
+      var p = document.createElement('div');
+      p.className = 'particle';
+      var x = 30 + Math.random() * (card.offsetWidth - 60);
+      var y = 30 + Math.random() * (card.offsetHeight - 60);
+      var tx = (Math.random() - 0.5) * 300;
+      var ty = (Math.random() - 0.5) * 300;
+      var dur = 0.5 + Math.random() * 0.6;
+      p.style.cssText = 'left:' + x + 'px;top:' + y + 'px;--tx:' + tx + 'px;--ty:' + ty + 'px;--dur:' + dur + 's;background:' + glowColor;
+      p.classList.add('animating');
+      pContainer.appendChild(p);
+    }
+    setTimeout(function() { if (pContainer) pContainer.innerHTML = ''; }, 1200);
+  }
+  var bars = card.querySelectorAll('.chart-bar');
+  bars.forEach(function(bar) { bar.classList.add('glow'); setTimeout(function() { bar.classList.remove('glow'); }, 800); });
+}
+
+// ─── Helpers ───────────────────────────────────────
+function timeAgo(iso) {
+  if (!iso) return 'Nunca';
+  var diff = Date.now() - new Date(iso + 'Z').getTime();
+  var sec = Math.floor(diff / 1000);
+  if (sec < 60) return 'hace ' + sec + 's';
+  var min = Math.floor(sec / 60);
+  if (min < 60) return 'hace ' + min + 'm';
+  var hrs = Math.floor(min / 60);
+  if (hrs < 24) return 'hace ' + hrs + 'h';
+  var days = Math.floor(hrs / 24);
+  return 'hace ' + days + 'd';
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// ─── Add Server ────────────────────────────────────
+function openAddServer() {
+  document.getElementById('addName').value = '';
+  document.getElementById('addTarget').value = '';
+  document.getElementById('addType').value = 'server';
+  openModal('addServerModal');
+}
+
+function addServer() {
+  var name = document.getElementById('addName').value.trim();
+  var target = document.getElementById('addTarget').value.trim();
+  var type = document.getElementById('addType').value;
+  if (!name || !target) { toast('Completa todos los campos', 'error'); return; }
+  apiFetch(API, {
+    method: 'POST',
+    body: JSON.stringify({name: name, target: target, type: type})
+  })
+  .then(function(r) { if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'Error'); }); return r.json(); })
+  .then(function() { closeModal('addServerModal'); toast('Servidor añadido', 'success'); loadServers(); })
+  .catch(function(e) { toast('Error: ' + e.message, 'error'); });
+}
+
+// ─── Delete ────────────────────────────────────────
+function deleteServer(id) {
+  if (!confirm('¿Eliminar este servidor?')) return;
+  apiFetch(API + '/' + id, { method: 'DELETE' })
+    .then(function(r) { if (!r.ok) throw new Error('Error'); return r.json(); })
+    .then(function() { if (selectedId === id) selectedId = null; toast('Servidor eliminado', 'info'); loadServers(); })
+    .catch(function() { toast('Error al eliminar', 'error'); });
+}
+
+// ─── Check ─────────────────────────────────────────
+function checkNow(id) {
+  apiFetch(API + '/' + id + '/check', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function() { toast('Check completado', 'success'); loadServers(); })
+    .catch(function() { toast('Error en check', 'error'); });
+}
+
+// ─── Add Change ────────────────────────────────────
+function openChange(id, name) {
+  changeServerId = id;
+  document.getElementById('changeServerName').textContent = 'Servidor: ' + name;
+  document.getElementById('changeTitle').value = '';
+  document.getElementById('changeDesc').value = '';
+  document.getElementById('changeSeverity').value = 'medium';
+  openModal('addChangeModal');
+}
+
+function addChange() {
+  var title = document.getElementById('changeTitle').value.trim();
+  var desc = document.getElementById('changeDesc').value.trim();
+  var severity = document.getElementById('changeSeverity').value;
+  if (!title) { toast('El título es obligatorio', 'error'); return; }
+  apiFetch(API + '/' + changeServerId + '/changes', {
+    method: 'POST',
+    body: JSON.stringify({title: title, description: desc, severity: severity})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function() { closeModal('addChangeModal'); toast('Cambio registrado', 'success'); loadServers(); })
+  .catch(function() { toast('Error al registrar cambio', 'error'); });
+}
+
+// ─── History ───────────────────────────────────────
+function openHistory(id) {
+  var s = servers.find(function(x) { return x.id === id; });
+  if (!s) return;
+  document.getElementById('historyServerName').textContent = 'Servidor: ' + s.name;
+  apiFetch(API + '/' + id + '/changes')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var list = document.getElementById('historyList');
+      if (!data || data.length === 0) {
+        list.innerHTML = '<div style="color:var(--muted);font-size:14px;text-align:center;padding:20px">Sin cambios registrados</div>';
+      } else {
+        var html = '';
+        for (var i = 0; i < data.length; i++) {
+          var ch = data[i];
+          html += '<div class="history-item ' + ch.severity + '">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+              '<strong>' + escapeHtml(ch.title) + '</strong>' +
+              '<span style="font-size:11px;color:var(--muted)">' + timeAgo(ch.timestamp) + '</span>' +
+            '</div>' +
+            (ch.description ? '<div style="font-size:12px;color:rgba(255,255,255,0.5)">' + escapeHtml(ch.description) + '</div>' : '') +
+          '</div>';
+        }
+        list.innerHTML = html;
+      }
+      openModal('historyModal');
+    })
+    .catch(function() { toast('Error al cargar historial', 'error'); });
+}
+
+// ─── Shock ─────────────────────────────────────────
+var shockHistory = [];
+
+function openShock(id, name) {
+  shockServerId = id;
+  shockHistory = [];
+  var s = servers.find(function(x) { return x.id === id; });
+  var host = s ? s.target : '---';
+  document.getElementById('shockServerName').textContent = 'Servidor: ' + name;
+  document.getElementById('shockTermTitle').textContent = 'root@' + extractHost(host);
+  document.getElementById('shockHostDisplay').textContent = extractHost(host);
+  document.getElementById('shockPrompt').textContent = 'root@' + extractHost(host) + ':$';
+  document.getElementById('shockCommand').value = '';
+  document.getElementById('shockCommand').disabled = false;
+  document.getElementById('shockCommand').focus();
+  document.getElementById('shockSendBtn').disabled = false;
+  document.getElementById('shockSendBtn').innerHTML = '↵ Enviar';
+  var body = document.getElementById('shockTermBody');
+  body.innerHTML = '<div class="terminal-line muted">Conectando a <span class="host-highlight">' + extractHost(host) + '</span>...</div>' +
+    '<div class="terminal-line muted">Listo. Escribe un comando:</div>';
+
+  apiFetch('/api/servers/' + id + '/shock-config')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var info = document.getElementById('shockConfigInfo');
+      if (info) {
+        if (data.active) {
+          info.innerHTML = '⚙️ Usando <strong>config personalizada</strong> para este servidor';
+          info.classList.remove('hidden');
+        } else {
+          apiFetch('/api/shock-config-status').then(function(r2) { return r2.json(); }).then(function(g) {
+            if (g.custom) {
+              info.innerHTML = '⚙️ Usando configuración global de <code>shock_config.py</code>';
+              info.classList.remove('hidden');
+            } else {
+              info.classList.add('hidden');
+            }
+          }).catch(function() {});
+        }
+      }
+    })
+    .catch(function() {});
+
+  openModal('shockModal');
+}
+
+function extractHost(target) {
+  try { var u = new URL(target); return u.hostname; }
+  catch(e) { return target.split(':')[0]; }
+}
+
+function sendShock() {
+  var input = document.getElementById('shockCommand');
+  var cmd = input.value.trim();
+  if (!cmd) return;
+  input.value = '';
+  input.disabled = true;
+  var btn = document.getElementById('shockSendBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="shock-spinner"></span>Enviando...';
+  var body = document.getElementById('shockTermBody');
+  var s = servers.find(function(x) { return x.id === shockServerId; });
+  var host = s ? extractHost(s.target) : '---';
+  var cmdLine = document.createElement('div');
+  cmdLine.className = 'terminal-line prompt';
+  cmdLine.innerHTML = '<span style="color:var(--green)">root@' + host + ':$</span> <span style="color:var(--text)">' + escapeHtml(cmd) + '</span>';
+  body.appendChild(cmdLine);
+  var resultLine = document.createElement('div');
+  resultLine.className = 'terminal-line';
+  resultLine.id = 'shockResultLine';
+  resultLine.textContent = 'Ejecutando...';
+  body.appendChild(resultLine);
+  body.scrollTop = body.scrollHeight;
+
+  apiFetch(API + '/' + shockServerId + '/shock', {
+    method: 'POST',
+    body: JSON.stringify({command: cmd})
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    resultLine.className = 'terminal-line ' + (data.success ? 'success' : 'error');
+    resultLine.textContent = data.output || '(sin salida)';
+    body.scrollTop = body.scrollHeight;
+    if (data.success) { toast('✓ Comando ejecutado en ' + host, 'success'); }
+    else { toast('✗ Falló en ' + host, 'error'); }
+    shockHistory.push(cmd);
+    input.disabled = false;
+    input.focus();
+    btn.disabled = false;
+    btn.innerHTML = '↵ Enviar';
+    loadServers();
+  })
+  .catch(function(e) {
+    resultLine.className = 'terminal-line error';
+    resultLine.textContent = 'Error de conexión: ' + e.message;
+    body.scrollTop = body.scrollHeight;
+    input.disabled = false; input.focus();
+    btn.disabled = false; btn.innerHTML = '↵ Enviar';
+    toast('Error al enviar shock', 'error');
+  });
+}
+
+// ─── Shock Config ──────────────────────────────────
+function openShockConfig(id) {
+  shockConfigServerId = id;
+  var s = servers.find(function(x) { return x.id === id; });
+  if (!s) return;
+  document.getElementById('shockConfigServerName').textContent = 'Servidor: ' + s.name;
+  document.getElementById('shockConfigCode').value = '';
+  apiFetch('/api/servers/' + id + '/shock-config')
+    .then(function(r) { return r.json(); })
+    .then(function(data) { document.getElementById('shockConfigCode').value = data.code || ''; })
+    .catch(function() {});
+  document.getElementById('shockConfigTestOutput').className = 'shock-output';
+  document.getElementById('shockConfigTestOutput').textContent = '';
+  openModal('shockConfigModal');
+}
+
+function loadShockConfigFile(event) {
+  var file = event.target.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) { document.getElementById('shockConfigCode').value = e.target.result; toast('Archivo cargado: ' + file.name, 'success'); };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function saveShockConfig() {
+  var code = document.getElementById('shockConfigCode').value.trim();
+  var sid = shockConfigServerId;
+  if (!sid) { toast('Error: ID de servidor no disponible', 'error'); return; }
+  apiFetch('/api/servers/' + sid + '/shock-config', {
+    method: 'PUT',
+    body: JSON.stringify({code: code})
+  })
+  .then(function(r) {
+    if (!r.ok) return r.text().then(function(t) { throw new Error('HTTP ' + r.status + ': ' + t.slice(0,200)); });
+    return r.json();
+  })
+  .then(function() { closeModal('shockConfigModal'); toast('Configuración guardada', 'success'); loadServers(); })
+  .catch(function(e) { toast('Error al guardar: ' + e.message, 'error'); });
+}
+
+function deleteShockConfig() {
+  if (!confirm('¿Restaurar configuración de conexión por defecto?')) return;
+  document.getElementById('shockConfigCode').value = '';
+  apiFetch('/api/servers/' + shockConfigServerId + '/shock-config', { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function() { toast('Config restaurada a default', 'info'); loadServers(); })
+    .catch(function() { toast('Error', 'error'); });
+}
+
+function testShockConfig() {
+  var code = document.getElementById('shockConfigCode').value.trim();
+  if (!code) { toast('No hay código para probar', 'error'); return; }
+  var out = document.getElementById('shockConfigTestOutput');
+  out.className = 'shock-output show';
+  out.textContent = 'Guardando y probando...';
+  out.style.borderColor = 'var(--border)';
+  out.style.color = 'var(--text)';
+  apiFetch('/api/servers/' + shockConfigServerId + '/shock-config', {
+    method: 'PUT', body: JSON.stringify({code: code})
+  })
+  .then(function(r) {
+    if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'HTTP ' + r.status); });
+    return r.json();
+  })
+  .then(function() {
+    return apiFetch('/api/servers/' + shockConfigServerId + '/shock', {
+      method: 'POST', body: JSON.stringify({command: 'status'})
+    });
+  })
+  .then(function(r) {
+    if (!r.ok) return r.json().then(function(e) { throw new Error(e.detail || 'HTTP ' + r.status); });
+    return r.json();
+  })
+  .then(function(data) {
+    out.textContent = 'Resultado:\n' + (data.output || '(sin salida)');
+    out.style.borderColor = data.success ? 'var(--green)' : '#ef4444';
+    out.style.color = data.success ? 'var(--green)' : '#ef4444';
+  })
+  .catch(function(e) {
+    out.textContent = 'Error: ' + e.message;
+    out.style.borderColor = '#ef4444';
+    out.style.color = '#ef4444';
+  });
+}
+
+// ─── Compartir ─────────────────────────────────────
+function openShare(id, name) {
+  shareServerId = id;
+  document.getElementById('shareServerName').textContent = 'Servidor: ' + name;
+  document.getElementById('shareLink').value = '— Genera un enlace primero —';
+  loadCollaborators(id);
+  openModal('shareModal');
+}
+
+function generateInvite() {
+  var id = shareServerId;
+  if (!id) return;
+  apiFetch('/api/servers/' + id + '/invitations', { method: 'POST' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var link = window.location.origin + '?invite=' + data.token;
+      document.getElementById('shareLink').value = link;
+      toast('Enlace generado (válido 7 días)', 'success');
+    })
+    .catch(function() { toast('Error al generar enlace', 'error'); });
+}
+
+function copyShareLink() {
+  var el = document.getElementById('shareLink');
+  try {
+    navigator.clipboard.writeText(el.value);
+    toast('Enlace copiado', 'success');
+  } catch(e) {
+    el.select();
+    document.execCommand('copy');
+    toast('Enlace copiado', 'success');
+  }
+}
+
+function loadCollaborators(serverId) {
+  var list = document.getElementById('collabList');
+  list.innerHTML = '<div style="color:var(--muted);font-size:13px">Cargando...</div>';
+  apiFetch('/api/servers/' + serverId + '/collaborators')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || data.length === 0) {
+        list.innerHTML = '<div style="color:var(--muted);font-size:13px">Sin colaboradores aún</div>';
+        return;
+      }
+      var html = '';
+      for (var i = 0; i < data.length; i++) {
+        var c = data[i];
+        var roleName = c.role === 'admin' ? 'Admin' : 'Lector';
+        html += '<div class="collab-item">' +
+          '<div class="collab-item-info">' +
+            '<span class="collab-item-email">' + escapeHtml(c.user_id) + '</span>' +
+            '<span class="collab-item-role">' + roleName + '</span>' +
+          '</div>' +
+          '<button class="btn btn-danger btn-xs" onclick="removeCollab(\'' + c.server_id + '\',\'' + c.user_id + '\')">✕</button>' +
+        '</div>';
+      }
+      list.innerHTML = html;
+    })
+    .catch(function() { list.innerHTML = '<div style="color:var(--muted);font-size:13px">Error al cargar</div>'; });
+}
+
+function removeCollab(serverId, userId) {
+  if (!confirm('¿Eliminar este colaborador?')) return;
+  apiFetch('/api/collaborators/' + serverId + '/' + userId, { method: 'DELETE' })
+    .then(function(r) { return r.json(); })
+    .then(function() { toast('Colaborador eliminado', 'info'); loadCollaborators(serverId); })
+    .catch(function() { toast('Error', 'error'); });
+}
+
+// ─── Invitations ───────────────────────────────────
+async function acceptInvitation(token) {
+  try {
+    var r = await apiFetch('/api/invitations/' + token + '/accept', { method: 'POST' });
+    if (r.ok) {
+      toast('¡Invitación aceptada!', 'success');
+      loadServers();
+    } else {
+      var e = await r.json();
+      toast('Error: ' + (e.detail || 'Invitación inválida'), 'error');
+    }
+  } catch(e) {
+    toast('Error al aceptar invitación', 'error');
+  }
+}
+
+// ─── Polling ───────────────────────────────────────
+var pollingInterval = null;
+function startPolling() {
+  if (pollingInterval) clearInterval(pollingInterval);
+  pollingInterval = setInterval(loadServers, 5000);
+}
+
+// ─── Init ──────────────────────────────────────────
+init();
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(function(el) {
+  el.addEventListener('click', function(e) {
+    if (e.target === el) closeModal(el.id);
+  });
+});
+
+// Enter key for shock terminal
+(function() {
+  var shockInput = document.getElementById('shockCommand');
+  if (shockInput) {
+    shockInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        sendShock();
+      }
+    });
+  }
+})();
+</script>
+</body>
+</html>
