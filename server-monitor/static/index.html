@@ -1154,46 +1154,50 @@ function openHistory(id) {
 var shockHistory = [];
 
 function openShock(id, name) {
-  shockServerId = id;
-  shockHistory = [];
-  var s = servers.find(function(x) { return x.id === id; });
-  var host = s ? s.target : '---';
-  document.getElementById('shockServerName').textContent = 'Servidor: ' + name;
-  document.getElementById('shockTermTitle').textContent = 'root@' + extractHost(host);
-  document.getElementById('shockHostDisplay').textContent = extractHost(host);
-  document.getElementById('shockPrompt').textContent = 'root@' + extractHost(host) + ':$';
-  document.getElementById('shockCommand').value = '';
-  document.getElementById('shockCommand').disabled = false;
-  document.getElementById('shockCommand').focus();
-  document.getElementById('shockSendBtn').disabled = false;
-  document.getElementById('shockSendBtn').innerHTML = '↵ Enviar';
-  var body = document.getElementById('shockTermBody');
-  body.innerHTML = '<div class="terminal-line muted">Conectando a <span class="host-highlight">' + extractHost(host) + '</span>...</div>' +
-    '<div class="terminal-line muted">Listo. Escribe un comando:</div>';
+  try {
+    shockServerId = id;
+    shockHistory = [];
+    var s = servers.find(function(x) { return x.id === id; });
+    var host = s ? s.target : '---';
+    document.getElementById('shockServerName').textContent = 'Servidor: ' + name;
+    document.getElementById('shockTermTitle').textContent = 'root@' + extractHost(host);
+    document.getElementById('shockHostDisplay').textContent = extractHost(host);
+    document.getElementById('shockPrompt').textContent = 'root@' + extractHost(host) + ':$';
+    document.getElementById('shockCommand').value = '';
+    document.getElementById('shockCommand').disabled = false;
+    document.getElementById('shockCommand').focus();
+    document.getElementById('shockSendBtn').disabled = false;
+    document.getElementById('shockSendBtn').innerHTML = '↵ Enviar';
+    var body = document.getElementById('shockTermBody');
+    body.innerHTML = '<div class="terminal-line muted">Conectando a <span class="host-highlight">' + extractHost(host) + '</span>...</div>' +
+      '<div class="terminal-line muted">Listo. Escribe un comando:</div>';
 
-  apiFetch('/api/servers/' + id + '/shock-config')
-    .then(function(r) { return safeJson(r); })
-    .then(function(data) {
-      var info = document.getElementById('shockConfigInfo');
-      if (info) {
-        if (data.active) {
-          info.innerHTML = '⚙️ Usando <strong>config personalizada</strong> para este servidor';
-          info.classList.remove('hidden');
-        } else {
-          apiFetch('/api/shock-config-status').then(function(r2) { return safeJson(r2); }).then(function(g) {
-            if (g.custom) {
-              info.innerHTML = '⚙️ Usando configuración global de <code>shock_config.py</code>';
-              info.classList.remove('hidden');
-            } else {
-              info.classList.add('hidden');
-            }
-          }).catch(function() {});
+    apiFetch('/api/servers/' + id + '/shock-config')
+      .then(function(r) { return safeJson(r); })
+      .then(function(data) {
+        var info = document.getElementById('shockConfigInfo');
+        if (info) {
+          if (data.active) {
+            info.innerHTML = '⚙️ Usando <strong>config personalizada</strong> para este servidor';
+            info.classList.remove('hidden');
+          } else {
+            apiFetch('/api/shock-config-status').then(function(r2) { return safeJson(r2); }).then(function(g) {
+              if (g.custom) {
+                info.innerHTML = '⚙️ Usando configuración global de <code>shock_config.py</code>';
+                info.classList.remove('hidden');
+              } else {
+                info.classList.add('hidden');
+              }
+            }).catch(function() {});
+          }
         }
-      }
-    })
-    .catch(function() {});
+      })
+      .catch(function() {});
 
-  openModal('shockModal');
+    openModal('shockModal');
+  } catch(e) {
+    toast('Error al abrir terminal: ' + errMsg(e), 'error');
+  }
 }
 
 function extractHost(target) {
@@ -1202,54 +1206,58 @@ function extractHost(target) {
 }
 
 function sendShock() {
-  var input = document.getElementById('shockCommand');
-  var cmd = input.value.trim();
-  if (!cmd) return;
-  input.value = '';
-  input.disabled = true;
-  var btn = document.getElementById('shockSendBtn');
-  btn.disabled = true;
-  btn.innerHTML = '<span class="shock-spinner"></span>Enviando...';
-  var body = document.getElementById('shockTermBody');
-  var s = servers.find(function(x) { return x.id === shockServerId; });
-  var host = s ? extractHost(s.target) : '---';
-  var cmdLine = document.createElement('div');
-  cmdLine.className = 'terminal-line prompt';
-  cmdLine.innerHTML = '<span style="color:var(--green)">root@' + host + ':$</span> <span style="color:var(--text)">' + escapeHtml(cmd) + '</span>';
-  body.appendChild(cmdLine);
-  var resultLine = document.createElement('div');
-  resultLine.className = 'terminal-line';
-  resultLine.id = 'shockResultLine';
-  resultLine.textContent = 'Ejecutando...';
-  body.appendChild(resultLine);
-  body.scrollTop = body.scrollHeight;
+  try {
+    var input = document.getElementById('shockCommand');
+    var cmd = input.value.trim();
+    if (!cmd) return;
+    input.value = '';
+    input.disabled = true;
+    var btn = document.getElementById('shockSendBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="shock-spinner"></span>Enviando...';
+    var body = document.getElementById('shockTermBody');
+    var s = servers.find(function(x) { return x.id === shockServerId; });
+    var host = s ? extractHost(s.target) : '---';
+    var cmdLine = document.createElement('div');
+    cmdLine.className = 'terminal-line prompt';
+    cmdLine.innerHTML = '<span style="color:var(--green)">root@' + host + ':$</span> <span style="color:var(--text)">' + escapeHtml(cmd) + '</span>';
+    body.appendChild(cmdLine);
+    var resultLine = document.createElement('div');
+    resultLine.className = 'terminal-line';
+    resultLine.id = 'shockResultLine';
+    resultLine.textContent = 'Ejecutando...';
+    body.appendChild(resultLine);
+    body.scrollTop = body.scrollHeight;
 
-  apiFetch(API + '/' + shockServerId + '/shock', {
-    method: 'POST',
-    body: JSON.stringify({command: cmd})
-  })
-  .then(function(r) { if (!r.ok) return safeJson(r).then(function(e) { throw new Error(apiErrorMsg(e)); }); return safeJson(r); })
-  .then(function(data) {
-    resultLine.className = 'terminal-line ' + (data.success ? 'success' : 'error');
-    resultLine.textContent = data.output || '(sin salida)';
-    body.scrollTop = body.scrollHeight;
-    if (data.success) { toast('✓ Comando ejecutado en ' + host, 'success'); }
-    else { toast('✗ Falló en ' + host, 'error'); }
-    shockHistory.push(cmd);
-    input.disabled = false;
-    input.focus();
-    btn.disabled = false;
-    btn.innerHTML = '↵ Enviar';
-    loadServers();
-  })
-  .catch(function(e) {
-    resultLine.className = 'terminal-line error';
-    resultLine.textContent = 'Error de conexión: ' + errMsg(e);
-    body.scrollTop = body.scrollHeight;
-    input.disabled = false; input.focus();
-    btn.disabled = false; btn.innerHTML = '↵ Enviar';
-    toast('Error al enviar shock', 'error');
-  });
+    apiFetch(API + '/' + shockServerId + '/shock', {
+      method: 'POST',
+      body: JSON.stringify({command: cmd})
+    })
+    .then(function(r) { if (!r.ok) return safeJson(r).then(function(e) { throw new Error(apiErrorMsg(e)); }); return safeJson(r); })
+    .then(function(data) {
+      resultLine.className = 'terminal-line ' + (data.success ? 'success' : 'error');
+      resultLine.textContent = data.output || '(sin salida)';
+      body.scrollTop = body.scrollHeight;
+      if (data.success) { toast('✓ Comando ejecutado en ' + host, 'success'); }
+      else { toast('✗ Falló en ' + host, 'error'); }
+      shockHistory.push(cmd);
+      input.disabled = false;
+      input.focus();
+      btn.disabled = false;
+      btn.innerHTML = '↵ Enviar';
+      loadServers();
+    })
+    .catch(function(e) {
+      resultLine.className = 'terminal-line error';
+      resultLine.textContent = 'Error de conexión: ' + errMsg(e);
+      body.scrollTop = body.scrollHeight;
+      input.disabled = false; input.focus();
+      btn.disabled = false; btn.innerHTML = '↵ Enviar';
+      toast('Error al enviar shock', 'error');
+    });
+  } catch(e) {
+    toast('Error al enviar shock: ' + errMsg(e), 'error');
+  }
 }
 
 // ─── Shock Config ──────────────────────────────────
@@ -1433,7 +1441,11 @@ function startPolling() {
 // ─── Init ──────────────────────────────────────────
 init().catch(function(e) { console.error('Init error:', e); });
 
-window.onerror = function(msg) { toast('Error: ' + (typeof msg === 'string' ? msg : 'inesperado'), 'error'); return false; };
+window.onerror = function(msg, source, line, col, error) {
+  console.error('Uncaught error:', error || msg);
+  toast('Error: ' + (typeof msg === 'string' ? msg : 'inesperado'), 'error');
+  return false;
+};
 
 // Close modals on overlay click
 document.querySelectorAll('.modal-overlay').forEach(function(el) {
