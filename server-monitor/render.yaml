@@ -4,7 +4,7 @@ services:
     runtime: python
     repo: https://github.com/Demi1Codex/hope-server-monitor
     branch: master
-    buildCommand: pip install -r server-monitor/requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: cd server-monitor && python main.py
     autoDeploy: true
     envVars:
