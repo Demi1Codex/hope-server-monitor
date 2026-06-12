@@ -626,8 +626,7 @@
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<!-- Error Debug -->
-<div id="errorDebug" style="position:fixed;bottom:0;left:0;right:0;background:#1a0000;color:#ff4444;font-size:12px;font-family:monospace;padding:8px;z-index:9999;max-height:120px;overflow:auto;display:none;border-top:1px solid #ff4444;"></div>
+
 
 <script>
 // ─── Config ────────────────────────────────────────
@@ -648,10 +647,10 @@ if (SUPABASE_URL && SUPABASE_ANON_KEY && SUPABASE_URL !== '{{SUPABASE_URL}}') {
     _supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: { persistSession: true, autoRefreshToken: true }
     });
-    debugLog('Supabase client created');
-  } catch(e) { debugLog('Supabase init error: ' + errMsg(e)); }
+    // supabase ready
+  } catch(e) { }
 } else {
-  debugLog('SUPABASE placeholders not replaced, prompting...');
+  // placeholder prompt
   _supabase = window.supabase.createClient(
     prompt('SUPABASE_URL:') || '',
     prompt('SUPABASE_ANON_KEY:') || ''
@@ -717,17 +716,7 @@ function authError(msg) {
   document.getElementById('authError').textContent = typeof msg === 'string' ? msg : (msg && msg.message || 'Error desconocido');
 }
 
-function debugLog(err) {
-  var dbg = document.getElementById('errorDebug');
-  if (!dbg) return;
-  dbg.style.display = 'block';
-  var text = typeof err === 'string' ? err : (err && err.message ? err.message : (err && err.code ? err.code + ': ' + (err.message || '') : JSON.stringify(err)));
-  dbg.innerHTML = (new Date().toLocaleTimeString()) + ' - ' + text + '<br>' + dbg.innerHTML;
-  if (dbg.children.length > 10) dbg.removeChild(dbg.lastChild);
-}
-
 function errMsg(e) {
-  debugLog(e);
   if (typeof e === 'string') return e;
   if (e && e.message) return e.message;
   if (e && e.detail) {
@@ -744,12 +733,12 @@ async function handleLogin() {
   if (!email || !pass) { authError('Completa todos los campos'); return; }
   setAuthLoading(true, 'Iniciando sesión...');
   try {
-    debugLog('Login attempt: ' + email);
+    // login attempt
     var r = await _supabase.auth.signInWithPassword({ email: email, password: pass });
-    debugLog('Login response: ' + JSON.stringify({error: r.error ? r.error.message : null, hasSession: !!r.data.session}));
+    // login response
     if (r.error) throw new Error(r.error.message);
     await onAuthSuccess();
-  } catch(e) { debugLog('Login catch: ' + (e && e.message || JSON.stringify(e))); authError(errMsg(e)); restoreAuthForm(); }
+  } catch(e) { authError(errMsg(e)); restoreAuthForm(); }
 }
 
 async function handleRegister() {
@@ -881,10 +870,21 @@ function apiFetch(url, opts) {
   return fetch(url, opts);
 }
 
+function safeJson(r) {
+  return r.text().then(function(text) {
+    if (!text) return null;
+    var trimmed = text.trim();
+    if (trimmed.startsWith('<')) throw new Error('Backend no disponible. Verifica que el servidor esté encendido.');
+    try { return JSON.parse(text); } catch(e) {
+      throw new Error('Respuesta inválida del servidor: ' + trimmed.substring(0, 80));
+    }
+  });
+}
+
 // ─── Load ──────────────────────────────────────────
 function checkShockConfig() {
   apiFetch('/api/shock-config-status')
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return safeJson(r); })
     .then(function(data) {
       var badge = document.getElementById('configBadge');
       if (badge) badge.classList.toggle('hidden', !data.custom);
@@ -894,7 +894,7 @@ function checkShockConfig() {
 
 function loadServers() {
   apiFetch(API)
-    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return safeJson(r); })
     .then(function(data) {
       servers = data;
       renderCards();
@@ -1080,7 +1080,7 @@ function addServer() {
     method: 'POST',
     body: JSON.stringify({name: name, target: target, type: type})
   })
-  .then(function(r) { if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); }); return r.json(); })
+  .then(function(r) { if (!r.ok) return safeJson(r).then(function(e) { throw new Error(apiErrorMsg(e)); }); return safeJson(r); })
   .then(function() { closeModal('addServerModal'); toast('Servidor añadido', 'success'); loadServers(); })
   .catch(function(e) { toast('Error: ' + errMsg(e), 'error'); });
 }
@@ -1089,7 +1089,7 @@ function addServer() {
 function deleteServer(id) {
   if (!confirm('¿Eliminar este servidor?')) return;
   apiFetch(API + '/' + id, { method: 'DELETE' })
-    .then(function(r) { if (!r.ok) throw new Error('Error'); return r.json(); })
+    .then(function(r) { if (!r.ok) throw new Error('Error'); return safeJson(r); })
     .then(function() { if (selectedId === id) selectedId = null; toast('Servidor eliminado', 'info'); loadServers(); })
     .catch(function() { toast('Error al eliminar', 'error'); });
 }
@@ -1097,7 +1097,7 @@ function deleteServer(id) {
 // ─── Check ─────────────────────────────────────────
 function checkNow(id) {
   apiFetch(API + '/' + id + '/check', { method: 'POST' })
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return safeJson(r); })
     .then(function() { toast('Check completado', 'success'); loadServers(); })
     .catch(function() { toast('Error en check', 'error'); });
 }
@@ -1121,7 +1121,7 @@ function addChange() {
     method: 'POST',
     body: JSON.stringify({title: title, description: desc, severity: severity})
   })
-  .then(function(r) { return r.json(); })
+  .then(function(r) { return safeJson(r); })
   .then(function() { closeModal('addChangeModal'); toast('Cambio registrado', 'success'); loadServers(); })
   .catch(function() { toast('Error al registrar cambio', 'error'); });
 }
@@ -1132,7 +1132,7 @@ function openHistory(id) {
   if (!s) return;
   document.getElementById('historyServerName').textContent = 'Servidor: ' + s.name;
   apiFetch(API + '/' + id + '/changes')
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return safeJson(r); })
     .then(function(data) {
       var list = document.getElementById('historyList');
       if (!data || data.length === 0) {
@@ -1178,7 +1178,7 @@ function openShock(id, name) {
     '<div class="terminal-line muted">Listo. Escribe un comando:</div>';
 
   apiFetch('/api/servers/' + id + '/shock-config')
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return safeJson(r); })
     .then(function(data) {
       var info = document.getElementById('shockConfigInfo');
       if (info) {
@@ -1186,7 +1186,7 @@ function openShock(id, name) {
           info.innerHTML = '⚙️ Usando <strong>config personalizada</strong> para este servidor';
           info.classList.remove('hidden');
         } else {
-          apiFetch('/api/shock-config-status').then(function(r2) { return r2.json(); }).then(function(g) {
+          apiFetch('/api/shock-config-status').then(function(r2) { return safeJson(r2); }).then(function(g) {
             if (g.custom) {
               info.innerHTML = '⚙️ Usando configuración global de <code>shock_config.py</code>';
               info.classList.remove('hidden');
@@ -1234,7 +1234,7 @@ function sendShock() {
     method: 'POST',
     body: JSON.stringify({command: cmd})
   })
-  .then(function(r) { if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); }); return r.json(); })
+  .then(function(r) { if (!r.ok) return safeJson(r).then(function(e) { throw new Error(apiErrorMsg(e)); }); return safeJson(r); })
   .then(function(data) {
     resultLine.className = 'terminal-line ' + (data.success ? 'success' : 'error');
     resultLine.textContent = data.output || '(sin salida)';
@@ -1266,7 +1266,7 @@ function openShockConfig(id) {
   document.getElementById('shockConfigServerName').textContent = 'Servidor: ' + s.name;
   document.getElementById('shockConfigCode').value = '';
   apiFetch('/api/servers/' + id + '/shock-config')
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return safeJson(r); })
     .then(function(data) { document.getElementById('shockConfigCode').value = data.code || ''; })
     .catch(function() {});
   document.getElementById('shockConfigTestOutput').className = 'shock-output';
@@ -1292,8 +1292,8 @@ function saveShockConfig() {
     body: JSON.stringify({code: code})
   })
   .then(function(r) {
-    if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); });
-    return r.json();
+    if (!r.ok) return safeJson(r).then(function(e) { throw new Error(apiErrorMsg(e)); });
+    return safeJson(r);
   })
   .then(function() { closeModal('shockConfigModal'); toast('Configuración guardada', 'success'); loadServers(); })
   .catch(function(e) { toast('Error al guardar: ' + errMsg(e), 'error'); });
@@ -1303,7 +1303,7 @@ function deleteShockConfig() {
   if (!confirm('¿Restaurar configuración de conexión por defecto?')) return;
   document.getElementById('shockConfigCode').value = '';
   apiFetch('/api/servers/' + shockConfigServerId + '/shock-config', { method: 'DELETE' })
-    .then(function(r) { if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); }); return r.json(); })
+    .then(function(r) { if (!r.ok) return safeJson(r).then(function(e) { throw new Error(apiErrorMsg(e)); }); return safeJson(r); })
     .then(function() { toast('Config restaurada a default', 'info'); loadServers(); })
     .catch(function() { toast('Error', 'error'); });
 }
@@ -1320,8 +1320,8 @@ function testShockConfig() {
     method: 'PUT', body: JSON.stringify({code: code})
   })
   .then(function(r) {
-    if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); });
-    return r.json();
+    if (!r.ok) return safeJson(r).then(function(e) { throw new Error(apiErrorMsg(e)); });
+    return safeJson(r);
   })
   .then(function() {
     return apiFetch('/api/servers/' + shockConfigServerId + '/shock', {
@@ -1329,8 +1329,8 @@ function testShockConfig() {
     });
   })
   .then(function(r) {
-    if (!r.ok) return r.json().then(function(e) { throw new Error(apiErrorMsg(e)); });
-    return r.json();
+    if (!r.ok) return safeJson(r).then(function(e) { throw new Error(apiErrorMsg(e)); });
+    return safeJson(r);
   })
   .then(function(data) {
     out.textContent = 'Resultado:\n' + (data.output || '(sin salida)');
@@ -1357,7 +1357,7 @@ function generateInvite() {
   var id = shareServerId;
   if (!id) return;
   apiFetch('/api/servers/' + id + '/invitations', { method: 'POST' })
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return safeJson(r); })
     .then(function(data) {
       var link = window.location.origin + '?invite=' + data.token;
       document.getElementById('shareLink').value = link;
@@ -1382,7 +1382,7 @@ function loadCollaborators(serverId) {
   var list = document.getElementById('collabList');
   list.innerHTML = '<div style="color:var(--muted);font-size:13px">Cargando...</div>';
   apiFetch('/api/servers/' + serverId + '/collaborators')
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return safeJson(r); })
     .then(function(data) {
       if (!data || data.length === 0) {
         list.innerHTML = '<div style="color:var(--muted);font-size:13px">Sin colaboradores aún</div>';
@@ -1408,7 +1408,7 @@ function loadCollaborators(serverId) {
 function removeCollab(serverId, userId) {
   if (!confirm('¿Eliminar este colaborador?')) return;
   apiFetch('/api/collaborators/' + serverId + '/' + userId, { method: 'DELETE' })
-    .then(function(r) { return r.json(); })
+    .then(function(r) { return safeJson(r); })
     .then(function() { toast('Colaborador eliminado', 'info'); loadCollaborators(serverId); })
     .catch(function() { toast('Error', 'error'); });
 }
@@ -1421,7 +1421,7 @@ async function acceptInvitation(token) {
       toast('¡Invitación aceptada!', 'success');
       loadServers();
     } else {
-      var e = await r.json();
+      var e = await safeJson(r);
       toast('Error: ' + errMsg(e), 'error');
     }
   } catch(e) {
