@@ -1167,7 +1167,6 @@ function openShock(id, name) {
     var host = s ? s.target : '---';
     document.getElementById('shockServerName').textContent = 'Servidor: ' + name;
     document.getElementById('shockTermTitle').textContent = 'root@' + extractHost(host);
-    document.getElementById('shockHostDisplay').textContent = extractHost(host);
     document.getElementById('shockPrompt').textContent = 'root@' + extractHost(host) + ':$';
     document.getElementById('shockCommand').value = '';
     document.getElementById('shockCommand').disabled = false;
@@ -1175,7 +1174,7 @@ function openShock(id, name) {
     document.getElementById('shockSendBtn').disabled = false;
     document.getElementById('shockSendBtn').innerHTML = '↵ Enviar';
     var body = document.getElementById('shockTermBody');
-    body.innerHTML = '<div class="terminal-line muted">Conectando a <span class="host-highlight">' + extractHost(host) + '</span>...</div>' +
+    body.innerHTML = '<div class="terminal-line muted">Conectando a <span class="host-highlight" id="shockHostDisplay">' + extractHost(host) + '</span>...</div>' +
       '<div class="terminal-line muted">Listo. Escribe un comando:</div>';
 
     apiFetch('/api/servers/' + id + '/shock-config')
